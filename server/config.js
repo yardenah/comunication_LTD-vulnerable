@@ -7,7 +7,7 @@ const config = {
   port: 5000,
   nodeEnv: 'development',
   
-  passwordHistoryLimit: 2, // min 1 max 100
+  passwordHistoryLimit: 3, // min 1 max 100
   passwordLength: 10,
   passwordLimitation: {
     includeUppercase: true,
