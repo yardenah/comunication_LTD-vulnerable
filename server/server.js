@@ -330,7 +330,7 @@ app.post('/api/register', async (req, res) => {
 
     // SQLi vulnerability: building query with string concatenation
     const query = `INSERT INTO users (username, email, password, salt) 
-    VALUES ('${username}', '${email}', '${password}', '${salt}')`;
+    VALUES ('${username}', '${email}', '${hash}', '${salt}')`;
     
     db.run(query,
       async function(err) {
@@ -419,9 +419,9 @@ app.post('/api/login', (req, res) => {
   }
 
   // SQLi vulnerability: building query with string concatenation
-  const query = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`;
+  const query1 = `SELECT * FROM users WHERE username = '${username}'`;
   
-  db.get(query, async (err, user) => {
+  db.get(query1, async (err, user) => {
     if (err) {
       return res.status(500).json('Login failed');
     }
@@ -429,13 +429,29 @@ app.post('/api/login', (req, res) => {
     if (!user) {
       return res.status(401).json('Invalid credentials');
     }
-    
-    // Successful login - reset attempts
-    loginAttemptsMap[username] = { attempts: 0, lastAttempt: null, blockedUntil: null };
-    
-    res.json({ message: 'Login successful', userId: user.id, username: user.username, email: user.email });
+
+    const { hash } = hashPassword(password, user.salt);
+
+    // SQLi vulnerability: building query with string concatenation
+    const query2 = `SELECT * FROM users WHERE username = '${username}' AND password = '${hash}'`;
+
+      db.get(query2, async (err, user) => {
+      if (err) {
+        return res.status(500).json('Login failed');
+      }
+      
+      if (!user) {
+        return res.status(401).json('Invalid credentials');
+      }
+      
+      // Successful login - reset attempts
+      loginAttemptsMap[username] = { attempts: 0, lastAttempt: null, blockedUntil: null };
+      
+      res.json({ message: 'Login successful', userId: user.id, username: user.username, email: user.email });
+    });
   });
 });
+
 
 
 /**
