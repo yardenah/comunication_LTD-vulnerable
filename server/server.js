@@ -125,7 +125,7 @@ async function validatePassword(userId, password) {
   if (config.passwordLimitation.includeSpecial && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
     errors.push('Password must include at least one special character');
   }
-  if (config.dictionary.includes(password.toLowerCase())) {
+  if (config.dictionary.includes(password)) {
     errors.push('Password is too common or forbidden');
   }
 
