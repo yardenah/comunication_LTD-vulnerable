@@ -6,7 +6,11 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const cors = require('cors');
 const path = require('path');
-const { hashPassword, verifyPassword, generateResetToken } = require('./password-utils');
+const {
+  hashPassword,
+  verifyPassword,
+  generateResetToken,
+} = require('./password-utils');
 const config = require('./config');
 
 const app = express();
@@ -22,63 +26,87 @@ async function checkPasswordHistory(userId, newPassword, historyLimit) {
       resolve(false); // No history check required, so no password reuse detected
       return;
     }
-    
+
     // Safety limit to prevent memory issues
     const safeHistoryLimit = Math.min(historyLimit, 100);
     if (safeHistoryLimit !== historyLimit) {
-      console.warn(`History limit ${historyLimit} exceeds safety limit, using ${safeHistoryLimit} instead`);
+      console.warn(
+        `History limit ${historyLimit} exceeds safety limit, using ${safeHistoryLimit} instead`
+      );
     }
 
-    console.log("Checking password history for user:", userId, "with limit:", safeHistoryLimit);
-    console.log("SQL Query: SELECT password_hash, salt FROM password_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?");
-    console.log("Parameters:", [userId, safeHistoryLimit]);
+    console.log(
+      'Checking password history for user:',
+      userId,
+      'with limit:',
+      safeHistoryLimit
+    );
+    console.log(
+      'SQL Query: SELECT password_hash, salt FROM password_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
+    );
+    console.log('Parameters:', [userId, safeHistoryLimit]);
 
     // First, let's check if there are any password history entries at all
-    db.get('SELECT COUNT(*) as total FROM password_history WHERE user_id = ?', [userId], (countErr, countResult) => {
-      if (countErr) {
-        console.error('Error counting password history entries:', countErr);
-        reject(countErr);
-        return;
-      }
-      
-      console.log(`Total password history entries for user ${userId}:`, countResult.total);
-
-      db.all(
-        'SELECT password_hash, salt FROM password_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
-        [userId, safeHistoryLimit],
-        (err, rows) => {
-          if (err) {
-            console.error('Database error in checkPasswordHistory:', err);
-            reject(err);
-            return;
-          }
-
-          console.log(`Found ${rows.length} password history entries`);
-          
-          // Debug: Log the actual data being returned
-          rows.forEach((row, index) => {
-            console.log(`Row ${index + 1}:`, {
-              id: row.id,
-              user_id: row.user_id,
-              password_hash: row.password_hash ? row.password_hash.substring(0, 20) + '...' : 'null',
-              salt: row.salt ? row.salt.substring(0, 20) + '...' : 'null',
-              created_at: row.created_at
-            });
-          });
-
-          // Check if new password matches any of the recent passwords by verifying against each stored hash
-          const isPasswordReused = rows.some((row, index) => {
-            console.log(`Checking password history entry ${index + 1}/${rows.length}`);
-            const isReused = verifyPassword(newPassword, row.password_hash, row.salt);
-            console.log(`Password reuse check result:`, isReused);
-            return isReused;
-          });
-
-          console.log(`Final password reuse result:`, isPasswordReused);
-          resolve(isPasswordReused);
+    db.get(
+      'SELECT COUNT(*) as total FROM password_history WHERE user_id = ?',
+      [userId],
+      (countErr, countResult) => {
+        if (countErr) {
+          console.error('Error counting password history entries:', countErr);
+          reject(countErr);
+          return;
         }
-      );
-    });
+
+        console.log(
+          `Total password history entries for user ${userId}:`,
+          countResult.total
+        );
+
+        db.all(
+          'SELECT password_hash, salt FROM password_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+          [userId, safeHistoryLimit],
+          (err, rows) => {
+            if (err) {
+              console.error('Database error in checkPasswordHistory:', err);
+              reject(err);
+              return;
+            }
+
+            console.log(`Found ${rows.length} password history entries`);
+
+            // Debug: Log the actual data being returned
+            rows.forEach((row, index) => {
+              console.log(`Row ${index + 1}:`, {
+                id: row.id,
+                user_id: row.user_id,
+                password_hash: row.password_hash
+                  ? row.password_hash.substring(0, 20) + '...'
+                  : 'null',
+                salt: row.salt ? row.salt.substring(0, 20) + '...' : 'null',
+                created_at: row.created_at,
+              });
+            });
+
+            // Check if new password matches any of the recent passwords by verifying against each stored hash
+            const isPasswordReused = rows.some((row, index) => {
+              console.log(
+                `Checking password history entry ${index + 1}/${rows.length}`
+              );
+              const isReused = verifyPassword(
+                newPassword,
+                row.password_hash,
+                row.salt
+              );
+              console.log(`Password reuse check result:`, isReused);
+              return isReused;
+            });
+
+            console.log(`Final password reuse result:`, isPasswordReused);
+            resolve(isPasswordReused);
+          }
+        );
+      }
+    );
   });
 }
 
@@ -86,10 +114,12 @@ async function checkPasswordHistory(userId, newPassword, historyLimit) {
 async function addPasswordToHistory(userId, passwordHash, salt) {
   return new Promise((resolve, reject) => {
     console.log(`Adding password to history for user ${userId}:`, {
-      passwordHash: passwordHash ? passwordHash.substring(0, 20) + '...' : 'null',
-      salt: salt ? salt.substring(0, 20) + '...' : 'null'
+      passwordHash: passwordHash
+        ? passwordHash.substring(0, 20) + '...'
+        : 'null',
+      salt: salt ? salt.substring(0, 20) + '...' : 'null',
     });
-    
+
     db.run(
       'INSERT INTO password_history (user_id, password_hash, salt) VALUES (?, ?, ?)',
       [userId, passwordHash, salt],
@@ -98,7 +128,9 @@ async function addPasswordToHistory(userId, passwordHash, salt) {
           console.error('Error adding password to history:', err);
           reject(err);
         } else {
-          console.log(`Password successfully added to history for user ${userId}`);
+          console.log(
+            `Password successfully added to history for user ${userId}`
+          );
           resolve();
         }
       }
@@ -106,12 +138,14 @@ async function addPasswordToHistory(userId, passwordHash, salt) {
   });
 }
 
-// Helper function to validate password strength 
+// Helper function to validate password strength
 async function validatePassword(userId, password) {
   const errors = [];
 
   if (password.length < config.passwordLength) {
-    errors.push(`Password must be at least ${config.passwordLength} characters long`);
+    errors.push(
+      `Password must be at least ${config.passwordLength} characters long`
+    );
   }
   if (config.passwordLimitation.includeUppercase && !/[A-Z]/.test(password)) {
     errors.push('Password must include at least one uppercase letter');
@@ -122,7 +156,10 @@ async function validatePassword(userId, password) {
   if (config.passwordLimitation.includeNumbers && !/[0-9]/.test(password)) {
     errors.push('Password must include at least one number');
   }
-  if (config.passwordLimitation.includeSpecial && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+  if (
+    config.passwordLimitation.includeSpecial &&
+    !/[!@#$%^&*(),.?":{}|<>]/.test(password)
+  ) {
     errors.push('Password must include at least one special character');
   }
   if (config.dictionary.includes(password)) {
@@ -130,15 +167,21 @@ async function validatePassword(userId, password) {
   }
 
   if (userId !== null) {
-    const isReused = await checkPasswordHistory(userId, password, config.passwordHistoryLimit);
+    const isReused = await checkPasswordHistory(
+      userId,
+      password,
+      config.passwordHistoryLimit
+    );
     if (isReused) {
-      errors.push(`Password cannot be the same as the last ${config.passwordHistoryLimit} passwords`);
+      errors.push(
+        `Password cannot be the same as the last ${config.passwordHistoryLimit} passwords`
+      );
     }
   }
 
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 }
 
@@ -146,9 +189,9 @@ async function validatePassword(userId, password) {
 const loginAttemptsMap = {};
 
 // Duration (30 minutes) after which a user's failed login attempts are cleared
-const ATTEMPT_RESET_TIME = 30 * 60 * 1000; 
+const ATTEMPT_RESET_TIME = 30 * 60 * 1000;
 
-// Helper function to handle failed login attempt 
+// Helper function to handle failed login attempt
 function handleFailedAttempt(username, res) {
   const userAttempts = loginAttemptsMap[username];
 
@@ -157,29 +200,23 @@ function handleFailedAttempt(username, res) {
 
   if (userAttempts.attempts >= config.loginAttempts) {
     userAttempts.blockedUntil = new Date(Date.now() + 30 * 60 * 1000);
-    return res.status(403).json('Too many login attempts. Try again in 30 minutes.');
+    return res
+      .status(403)
+      .json('Too many login attempts. Try again in 30 minutes.');
   }
-  
+
   return res.status(401).json('Invalid credentials');
 }
 
-// Escape function for XSS prevention
-const escapeHtml = (unsafe) => {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-};
-
 // Middleware
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(
+  cors({
+    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 app.use(express.json());
 
 // Global error handler middleware
@@ -230,7 +267,8 @@ const swaggerOptions = {
     info: {
       title: 'Communication LTD API',
       version: '1.0.0',
-      description: 'Simple API for Communication LTD app with intentional security vulnerabilities for educational purposes',
+      description:
+        'Simple API for Communication LTD app with intentional security vulnerabilities for educational purposes',
     },
     servers: [
       {
@@ -256,12 +294,12 @@ const transporter = nodemailer.createTransport({
   secure: true,
   port: 465,
   tls: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+  },
 });
 
 // Verify transporter configuration
-transporter.verify(function(error, success) {
+transporter.verify(function (error, success) {
   if (error) {
     console.log('Email transporter error:', error);
   } else {
@@ -305,25 +343,39 @@ transporter.verify(function(error, success) {
 // ❌ Vulnerable Register (SQL Injection)
 app.post('/api/register', async (req, res) => {
   const { username, email, password } = req.body;
-  
+
   // Input validation
-  if (!username || typeof username !== 'string' || username.trim().length === 0) {
-    return res.status(400).json('Username is required and must be a non-empty string');
-  }
-  
-  if (!email || typeof email !== 'string' || email.trim().length === 0) {
-    return res.status(400).json('Email is required and must be a non-empty string');
-  }
-  
-  if (!password || typeof password !== 'string' || password.trim().length === 0) {
-    return res.status(400).json('Password is required and must be a non-empty string');
+  if (
+    !username ||
+    typeof username !== 'string' ||
+    username.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('Username is required and must be a non-empty string');
   }
 
-  const { isValid, errors } = await validatePassword(null, password); 
+  if (!email || typeof email !== 'string' || email.trim().length === 0) {
+    return res
+      .status(400)
+      .json('Email is required and must be a non-empty string');
+  }
+
+  if (
+    !password ||
+    typeof password !== 'string' ||
+    password.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('Password is required and must be a non-empty string');
+  }
+
+  const { isValid, errors } = await validatePassword(null, password);
   if (!isValid) {
     return res.status(400).json(errors.join(', '));
   }
-  
+
   try {
     // Hash password using HMAC + Salt
     const { hash, salt } = hashPassword(password);
@@ -331,28 +383,32 @@ app.post('/api/register', async (req, res) => {
     // SQLi vulnerability: building query with string concatenation
     const query = `INSERT INTO users (username, email, password, salt) 
     VALUES ('${username}', '${email}', '${hash}', '${salt}')`;
-    
-    db.run(query,
-      async function(err) {
-        if (err) {
-          if (err.message.includes('UNIQUE constraint failed')) {
-            return res.status(400).json('Username already exists');
-          }
-          console.error('Database error during registration:', err);
-          return res.status(500).json('Registration failed');
+
+    db.run(query, async function (err) {
+      if (err) {
+        if (err.message.includes('UNIQUE constraint failed')) {
+          return res.status(400).json('Username already exists');
         }
-        
-        try {
-          // Add the initial password to history immediately
-          await addPasswordToHistory(this.lastID, hash, salt);
-          res.status(201).json({ message: 'User registered successfully', userId: this.lastID });
-        } catch (historyError) {
-          console.error('Error adding password to history:', historyError);
-          // User was created but history failed - still return success
-          res.status(201).json({ message: 'User registered successfully (history update failed)', userId: this.lastID });
-        }
+        console.error('Database error during registration:', err);
+        return res.status(500).json('Registration failed');
       }
-    );
+
+      try {
+        // Add the initial password to history immediately
+        await addPasswordToHistory(this.lastID, hash, salt);
+        res.status(201).json({
+          message: 'User registered successfully',
+          userId: this.lastID,
+        });
+      } catch (historyError) {
+        console.error('Error adding password to history:', historyError);
+        // User was created but history failed - still return success
+        res.status(201).json({
+          message: 'User registered successfully (history update failed)',
+          userId: this.lastID,
+        });
+      }
+    });
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json('Registration failed');
@@ -393,15 +449,42 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
 
+  if (
+    !username ||
+    typeof username !== 'string' ||
+    username.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('username is required and must be a non-empty string');
+  }
+
+  if (
+    !password ||
+    typeof password !== 'string' ||
+    password.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('password is required and must be a non-empty string');
+  }
+
   // Initialize user attempts if not exists
   if (!loginAttemptsMap[username]) {
-    loginAttemptsMap[username] = { attempts: 0, lastAttempt: null, blockedUntil: null };
+    loginAttemptsMap[username] = {
+      attempts: 0,
+      lastAttempt: null,
+      blockedUntil: null,
+    };
   }
 
   const userAttempts = loginAttemptsMap[username];
 
   // Reset attempts if last attempt was too long ago
-  if (userAttempts.lastAttempt && (Date.now() - userAttempts.lastAttempt.getTime()) > ATTEMPT_RESET_TIME) {
+  if (
+    userAttempts.lastAttempt &&
+    Date.now() - userAttempts.lastAttempt.getTime() > ATTEMPT_RESET_TIME
+  ) {
     userAttempts.attempts = 0;
     userAttempts.blockedUntil = null;
   }
@@ -413,19 +496,25 @@ app.post('/api/login', (req, res) => {
       userAttempts.attempts = 0;
       userAttempts.blockedUntil = null;
     } else {
-      const minutesLeft = Math.ceil((userAttempts.blockedUntil - new Date()) / 60000);
-      return res.status(403).json(`Too many login attempts. Try again in ${minutesLeft} minute(s).`);
+      const minutesLeft = Math.ceil(
+        (userAttempts.blockedUntil - new Date()) / 60000
+      );
+      return res
+        .status(403)
+        .json(
+          `Too many login attempts. Try again in ${minutesLeft} minute(s).`
+        );
     }
   }
 
   // SQLi vulnerability: building query with string concatenation
   const query1 = `SELECT * FROM users WHERE username = '${username}'`;
-  
+
   db.get(query1, async (err, user) => {
     if (err) {
       return res.status(500).json('Login failed');
     }
-    
+
     if (!user) {
       return res.status(401).json('Invalid credentials');
     }
@@ -435,24 +524,31 @@ app.post('/api/login', (req, res) => {
     // SQLi vulnerability: building query with string concatenation
     const query2 = `SELECT * FROM users WHERE username = '${username}' AND password = '${hash}'`;
 
-      db.get(query2, async (err, user) => {
+    db.get(query2, async (err, user) => {
       if (err) {
         return res.status(500).json('Login failed');
       }
-      
+
       if (!user) {
         return handleFailedAttempt(username, res);
       }
-      
+
       // Successful login - reset attempts
-      loginAttemptsMap[username] = { attempts: 0, lastAttempt: null, blockedUntil: null };
-      
-      res.json({ message: 'Login successful', userId: user.id, username: user.username, email: user.email });
+      loginAttemptsMap[username] = {
+        attempts: 0,
+        lastAttempt: null,
+        blockedUntil: null,
+      };
+
+      res.json({
+        message: 'Login successful',
+        userId: user.id,
+        username: user.username,
+        email: user.email,
+      });
     });
   });
 });
-
-
 
 /**
  * @swagger
@@ -489,68 +585,95 @@ app.post('/api/login', (req, res) => {
  */
 app.post('/api/change-password', async (req, res) => {
   const { username, oldPassword, newPassword } = req.body;
-  
+
   // Input validation
-  if (!username || typeof username !== 'string' || username.trim().length === 0) {
-    return res.status(400).json('Username is required and must be a non-empty string');
+  if (
+    !username ||
+    typeof username !== 'string' ||
+    username.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('Username is required and must be a non-empty string');
   }
-  
+
   if (!oldPassword || typeof oldPassword !== 'string') {
     return res.status(400).json('Old password is required');
   }
-  
-  if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length === 0) {
-    return res.status(400).json('New password is required and must be a non-empty string');
-  }
-  
-  if (oldPassword === newPassword) {
-    return res.status(400).json('New password must be different from old password');
-  }
-  
-  db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
-    if (err) {
-      console.error('Database error during password change:', err);
-      return res.status(500).json('Password change failed');
-    }
-    
-    if (!user) {
-      return res.status(401).json('User not found');
-    }
 
-    // Verify old password using HMAC + Salt
-    const isValidPassword = verifyPassword(oldPassword, user.password, user.salt);
-    if (!isValidPassword) {
-      return res.status(400).json('Invalid old password');
-    }
-    
-    // Validate new password requirements
-    const { isValid, errors } = await validatePassword(user.id, newPassword);
-    if (!isValid) {
-      return res.status(400).json(errors.join(', '));
-    }
-  
-    
-    // Hash new password using HMAC + Salt
-    const { hash: newHash, salt: newSalt } = hashPassword(newPassword);
-    
-    db.run('UPDATE users SET password = ?, salt = ? WHERE username = ?', [newHash, newSalt, username], async (err) => {
+  if (
+    !newPassword ||
+    typeof newPassword !== 'string' ||
+    newPassword.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('New password is required and must be a non-empty string');
+  }
+
+  if (oldPassword === newPassword) {
+    return res
+      .status(400)
+      .json('New password must be different from old password');
+  }
+
+  db.get(
+    'SELECT * FROM users WHERE username = ?',
+    [username],
+    async (err, user) => {
       if (err) {
-        console.error('Database error updating password:', err);
+        console.error('Database error during password change:', err);
         return res.status(500).json('Password change failed');
       }
-      
-      try {
-        // Add new password to history
-        await addPasswordToHistory(user.id, newHash, newSalt);
-        
-        res.json({ message: 'Password changed successfully' });
-      } catch (historyError) {
-        console.error('Error updating password history:', historyError);
-        // Password was changed but history update failed - still return success
-        res.json({ message: 'Password changed successfully (history update failed)' });
+
+      if (!user) {
+        return res.status(401).json('User not found');
       }
-    });
-  });
+
+      // Verify old password using HMAC + Salt
+      const isValidPassword = verifyPassword(
+        oldPassword,
+        user.password,
+        user.salt
+      );
+      if (!isValidPassword) {
+        return res.status(400).json('Invalid old password');
+      }
+
+      // Validate new password requirements
+      const { isValid, errors } = await validatePassword(user.id, newPassword);
+      if (!isValid) {
+        return res.status(400).json(errors.join(', '));
+      }
+
+      // Hash new password using HMAC + Salt
+      const { hash: newHash, salt: newSalt } = hashPassword(newPassword);
+
+      db.run(
+        'UPDATE users SET password = ?, salt = ? WHERE username = ?',
+        [newHash, newSalt, username],
+        async (err) => {
+          if (err) {
+            console.error('Database error updating password:', err);
+            return res.status(500).json('Password change failed');
+          }
+
+          try {
+            // Add new password to history
+            await addPasswordToHistory(user.id, newHash, newSalt);
+
+            res.json({ message: 'Password changed successfully' });
+          } catch (historyError) {
+            console.error('Error updating password history:', historyError);
+            // Password was changed but history update failed - still return success
+            res.json({
+              message: 'Password changed successfully (history update failed)',
+            });
+          }
+        }
+      );
+    }
+  );
 });
 
 /**
@@ -582,56 +705,65 @@ app.post('/api/change-password', async (req, res) => {
  */
 app.post('/api/request-reset-password', (req, res) => {
   const { username } = req.body;
-  
+
   // Input validation
-  if (!username || typeof username !== 'string' || username.trim().length === 0) {
-    return res.status(400).json('Username is required and must be a non-empty string');
+  if (
+    !username ||
+    typeof username !== 'string' ||
+    username.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('Username is required and must be a non-empty string');
   }
-  
+
   db.get('SELECT * FROM users WHERE username = ?', [username], (err, user) => {
     if (err) {
       console.error('Database error during password reset request:', err);
       return res.status(500).json('Request failed');
     }
-    
+
     if (!user) {
       return res.status(404).json('User not found');
     }
-    
+
     const resetToken = generateResetToken();
     const expiry = new Date(Date.now() + 3600000); // 1 hour
-    
-    db.run('UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE username = ?', 
-      [resetToken, expiry.toISOString(), username], (err) => {
-      if (err) {
-        console.error('Database error updating reset token:', err);
-        return res.status(500).json('Request failed');
-      }
-      
-      // Send email with reset token
-      const mailOptions = {
-        from: process.env.GMAIL_USER,
-        to: user.email,
-        subject: 'Password Reset Token',
-        text: `Your password reset token is: ${resetToken}. This token expires in 1 hour.`
-      };
-      
-      transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-          console.log('Email error:', error);
-          console.log('Email error details:', {
-            code: error.code,
-            command: error.command,
-            response: error.response,
-            responseCode: error.responseCode
-          });
-          return res.status(500).json('Failed to send email');
+
+    db.run(
+      'UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE username = ?',
+      [resetToken, expiry.toISOString(), username],
+      (err) => {
+        if (err) {
+          console.error('Database error updating reset token:', err);
+          return res.status(500).json('Request failed');
         }
-        
-        console.log('Email sent successfully:', info.messageId);
-        res.json({ message: 'Reset token sent to email' });
-      });
-    });
+
+        // Send email with reset token
+        const mailOptions = {
+          from: process.env.GMAIL_USER,
+          to: user.email,
+          subject: 'Password Reset Token',
+          text: `Your password reset token is: ${resetToken}. This token expires in 1 hour.`,
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+          if (error) {
+            console.log('Email error:', error);
+            console.log('Email error details:', {
+              code: error.code,
+              command: error.command,
+              response: error.response,
+              responseCode: error.responseCode,
+            });
+            return res.status(500).json('Failed to send email');
+          }
+
+          console.log('Email sent successfully:', info.messageId);
+          res.json({ message: 'Reset token sent to email' });
+        });
+      }
+    );
   });
 });
 
@@ -662,65 +794,88 @@ app.post('/api/request-reset-password', (req, res) => {
  *       200:
  *         description: Password reset successfully
  *       400:
- *         description:  Invalid/expired token or password invalid/reused 
+ *         description:  Invalid/expired token or password invalid/reused
  *       500:
  *         description: Server error during reset
  */
 app.post('/api/reset-password', async (req, res) => {
   const { username, token, newPassword } = req.body;
-  
+
   // Input validation
-  if (!username || typeof username !== 'string' || username.trim().length === 0) {
-    return res.status(400).json('Username is required and must be a non-empty string');
+  if (
+    !username ||
+    typeof username !== 'string' ||
+    username.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('Username is required and must be a non-empty string');
   }
-  
+
   if (!token || typeof token !== 'string' || token.trim().length === 0) {
     return res.status(400).json('Reset token is required');
   }
-  
-  if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length === 0) {
-    return res.status(400).json('New password is required and must be a non-empty string');
+
+  if (
+    !newPassword ||
+    typeof newPassword !== 'string' ||
+    newPassword.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('New password is required and must be a non-empty string');
   }
 
-  db.get('SELECT * FROM users WHERE username = ? AND reset_token = ? AND reset_token_expiry > ?', 
-    [username, token, new Date().toISOString()], async (err, user) => {
-    if (err) {
-      console.error('Database error during password reset:', err);
-      return res.status(500).json('Reset failed');
-    }
-    
-    if (!user) {
-      return res.status(400).json('Invalid or expired token');
-    }
-    
-    // Validate new password requirements
-    const { isValid, errors } = await validatePassword(user.id, newPassword);
-    if (!isValid) {
-      return res.status(400).json(errors.join(', '));
-    }
-    
-    // Hash new password using HMAC + Salt
-    const { hash: newHash, salt: newSalt } = hashPassword(newPassword);
-    
-    db.run('UPDATE users SET password = ?, salt = ?, reset_token = NULL, reset_token_expiry = NULL WHERE username = ?', 
-      [newHash, newSalt, username], async (err) => {
+  db.get(
+    'SELECT * FROM users WHERE username = ? AND reset_token = ? AND reset_token_expiry > ?',
+    [username, token, new Date().toISOString()],
+    async (err, user) => {
       if (err) {
-        console.error('Database error updating password during reset:', err);
+        console.error('Database error during password reset:', err);
         return res.status(500).json('Reset failed');
       }
-      
-      try {
-        // Add new password to history
-        await addPasswordToHistory(user.id, newHash, newSalt);
-        
-        res.json({ message: 'Password reset successfully' });
-      } catch (historyError) {
-        console.error('Error updating password history:', historyError);
-        // Password was reset but history update failed - still return success
-        res.json({ message: 'Password reset successfully (history update failed)' });
+
+      if (!user) {
+        return res.status(400).json('Invalid or expired token');
       }
-    });
-  });
+
+      // Validate new password requirements
+      const { isValid, errors } = await validatePassword(user.id, newPassword);
+      if (!isValid) {
+        return res.status(400).json(errors.join(', '));
+      }
+
+      // Hash new password using HMAC + Salt
+      const { hash: newHash, salt: newSalt } = hashPassword(newPassword);
+
+      db.run(
+        'UPDATE users SET password = ?, salt = ?, reset_token = NULL, reset_token_expiry = NULL WHERE username = ?',
+        [newHash, newSalt, username],
+        async (err) => {
+          if (err) {
+            console.error(
+              'Database error updating password during reset:',
+              err
+            );
+            return res.status(500).json('Reset failed');
+          }
+
+          try {
+            // Add new password to history
+            await addPasswordToHistory(user.id, newHash, newSalt);
+
+            res.json({ message: 'Password reset successfully' });
+          } catch (historyError) {
+            console.error('Error updating password history:', historyError);
+            // Password was reset but history update failed - still return success
+            res.json({
+              message: 'Password reset successfully (history update failed)',
+            });
+          }
+        }
+      );
+    }
+  );
 });
 
 /**
@@ -757,7 +912,7 @@ app.get('/api/config', (req, res) => {
   res.json({
     passwordLength: config.passwordLength,
     passwordLimitation: config.passwordLimitation,
-    passwordHistoryLimit: config.passwordHistoryLimit
+    passwordHistoryLimit: config.passwordHistoryLimit,
   });
 });
 
@@ -798,12 +953,12 @@ app.get('/api/clients', (req, res) => {
       console.error('Database error fetching clients:', err);
       return res.status(500).json('Failed to fetch clients');
     }
-    
+
     // Ensure clients is always an array
     if (!clients) {
       clients = [];
     }
-    
+
     res.json(clients);
   });
 });
@@ -844,23 +999,65 @@ app.get('/api/clients', (req, res) => {
 // ❌ Vulnerable Add Client (SQL Injection + Stored XSS)
 app.post('/api/clients', (req, res) => {
   const { fullName, email, phone, packageName, sector, address } = req.body;
-  
-  if (!fullName || typeof fullName !== 'string' || fullName.trim().length === 0) {
-    return res.status(400).json('Full name is required and must be a non-empty string');
+
+  if (
+    !fullName ||
+    typeof fullName !== 'string' ||
+    fullName.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('Full name is required and must be a non-empty string');
   }
-  
+
+  if (!email || typeof email !== 'string' || email.trim().length === 0) {
+    return res
+      .status(400)
+      .json('email is required and must be a non-empty string');
+  }
+
+  if (!phone || typeof phone !== 'string' || phone.trim().length === 0) {
+    return res
+      .status(400)
+      .json('phone is required and must be a non-empty string');
+  }
+
+  if (
+    !packageName ||
+    typeof packageName !== 'string' ||
+    packageName.trim().length === 0
+  ) {
+    return res
+      .status(400)
+      .json('packageName is required and must be a non-empty string');
+  }
+
+  if (!sector || typeof sector !== 'string' || sector.trim().length === 0) {
+    return res
+      .status(400)
+      .json('sector is required and must be a non-empty string');
+  }
+
+  if (!address || typeof address !== 'string' || address.trim().length === 0) {
+    return res
+      .status(400)
+      .json('adress is required and must be a non-empty string');
+  }
+
   // SQLi vulnerability + XSS (user input is stored as-is)
   const query = `INSERT INTO clients (fullName, email, phone, packageName, sector, address) 
   VALUES ('${fullName}', '${email}', '${phone}', '${packageName}', '${sector}', '${address}')`;
-   
-  db.run(query, function(err) {
+
+  db.run(query, function (err) {
     if (err) {
       console.error('Database error adding client:', err);
       return res.status(500).json('Failed to add client');
     }
-    
-   // Vulnerable — stored XSS (returns unsanitized user input as HTML)
-    res.status(201).json({message: `Client added: ${fullName}`, clientId: this.lastID });
+
+    // Vulnerable — stored XSS (returns unsanitized user input as HTML)
+    res
+      .status(201)
+      .json({ message: `Client added: ${fullName}`, clientId: this.lastID });
   });
 });
 
@@ -872,7 +1069,9 @@ app.use('*', (req, res) => {
 // Start server
 const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Swagger documentation available at http://localhost:${PORT}/api-docs`);
+  console.log(
+    `Swagger documentation available at http://localhost:${PORT}/api-docs`
+  );
 });
 
 // Graceful shutdown
