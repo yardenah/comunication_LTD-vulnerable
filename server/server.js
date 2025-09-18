@@ -130,7 +130,7 @@ async function validatePassword(userId, password) {
   }
 
   if (userId !== null) {
-    const isReused = await checkPasswordHistory(userId, password, config.passwordHistoryLimit + 1);
+    const isReused = await checkPasswordHistory(userId, password, config.passwordHistoryLimit);
     if (isReused) {
       errors.push(`Password cannot be the same as the last ${config.passwordHistoryLimit} passwords`);
     }
