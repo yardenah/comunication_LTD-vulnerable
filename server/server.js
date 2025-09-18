@@ -159,7 +159,7 @@ function handleFailedAttempt(username, res) {
     userAttempts.blockedUntil = new Date(Date.now() + 30 * 60 * 1000);
     return res.status(403).json('Too many login attempts. Try again in 30 minutes.');
   }
-
+  
   return res.status(401).json('Invalid credentials');
 }
 
@@ -441,7 +441,7 @@ app.post('/api/login', (req, res) => {
       }
       
       if (!user) {
-        return res.status(401).json('Invalid credentials');
+        return handleFailedAttempt(username, res);
       }
       
       // Successful login - reset attempts
