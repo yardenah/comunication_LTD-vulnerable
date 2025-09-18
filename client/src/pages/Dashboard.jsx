@@ -1,24 +1,23 @@
-import { useState, useEffect } from "react";
-import Input from "../components/Input";
-import Button from "../components/Button";
-import { useNavigate } from "react-router-dom";
-import { getClients, addClient } from "../api";
+import { useState, useEffect } from 'react';
+import Input from '../components/Input';
+import Button from '../components/Button';
+import { useNavigate } from 'react-router-dom';
+import { getClients, addClient } from '../api';
 
 export default function ClientsPage() {
   const [clientData, setClientData] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    packageName:"",
-    sector:"",
-    address: "",
+    fullName: '',
+    email: '',
+    phone: '',
+    packageName: '',
+    sector: '',
+    address: '',
   });
 
   const navigate = useNavigate();
   const [clients, setClients] = useState([]);
-  const [loadingClients, setLoadingClients] = useState(false);  
+  const [loadingClients, setLoadingClients] = useState(false);
   const [addingClient, setAddingClient] = useState(false);
-
 
   useEffect(() => {
     fetchClients();
@@ -48,7 +47,7 @@ export default function ClientsPage() {
     e.preventDefault();
 
     if (!clientData.fullName.trim()) {
-      alert("Please enter full name");
+      alert('Please enter full name');
       return;
     }
 
@@ -56,7 +55,7 @@ export default function ClientsPage() {
       clientData.email &&
       !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(clientData.email)
     ) {
-      alert("Please enter a valid email");
+      alert('Please enter a valid email');
       return;
     }
 
@@ -71,12 +70,12 @@ export default function ClientsPage() {
       await fetchClients();
 
       setClientData({
-        fullName: "",
-        email: "",
-        phone: "",
-        packageName:"",
-        sector:"",
-        address: "",
+        fullName: '',
+        email: '',
+        phone: '',
+        packageName: '',
+        sector: '',
+        address: '',
       });
     } catch (err) {
       alert(err.message);
@@ -86,15 +85,23 @@ export default function ClientsPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
-    navigate("/");
+    localStorage.removeItem('user');
+    navigate('/');
   };
 
   return (
     <div className="container">
       <div className="top-bar">
-        <Button text="Logout" onClick={handleLogout} className="logout-button" />
-        <Button text="Change Password" onClick={() => navigate("/change-password")} className="change-password" />
+        <Button
+          text="Logout"
+          onClick={handleLogout}
+          className="logout-button"
+        />
+        <Button
+          text="Change Password"
+          onClick={() => navigate('/change-password')}
+          className="change-password"
+        />
       </div>
 
       <h1>Clients Management</h1>
@@ -126,18 +133,18 @@ export default function ClientsPage() {
             className="form-input"
           />
           <Input
-          label="Package Name"
-          name="packageName"
-          type="text"
-          value={clientData.packageName}
-          onChange={handleChange}
+            label="Package Name"
+            name="packageName"
+            type="text"
+            value={clientData.packageName}
+            onChange={handleChange}
           />
           <Input
-          label="Sector"
-          name="sector"
-          type="text"
-          value={clientData.sector}
-          onChange={handleChange}
+            label="Sector"
+            name="sector"
+            type="text"
+            value={clientData.sector}
+            onChange={handleChange}
           />
           <Input
             label="Address"
@@ -180,13 +187,27 @@ export default function ClientsPage() {
               {clients.map((client) => (
                 <tr key={client.id}>
                   <td>
-                    <div dangerouslySetInnerHTML={{ __html: client.fullName }} />
+                    <div
+                      dangerouslySetInnerHTML={{ __html: client.fullName }}
+                    />
                   </td>
-                  <td>{client.email || "N/A"}</td>
-                  <td>{client.phone || "N/A"}</td>
-                  <td>{client.packageName || "N/A"}</td>
-                  <td>{client.sector || "N/A"}</td>
-                  <td>{client.address || "N/A"}</td>
+                  <td>
+                    <div dangerouslySetInnerHTML={{ __html: client.email }} />
+                  </td>
+                  <td>
+                    <div dangerouslySetInnerHTML={{ __html: client.phone }} />
+                  </td>
+                  <td>
+                    <div
+                      dangerouslySetInnerHTML={{ __html: client.packageName }}
+                    />
+                  </td>
+                  <td>
+                    <div dangerouslySetInnerHTML={{ __html: client.sector }} />
+                  </td>
+                  <td>
+                    <div dangerouslySetInnerHTML={{ __html: client.address }} />
+                  </td>
                 </tr>
               ))}
             </tbody>
