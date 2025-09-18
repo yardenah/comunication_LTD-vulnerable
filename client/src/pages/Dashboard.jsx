@@ -62,17 +62,13 @@ export default function ClientsPage() {
 
     setAddingClient(true);
     try {
-      const response = await addClient(clientData);
-
-      const newClient = {
-      id: response.clientId,
-      ...clientData
-      };
-
-      setClients((prev) => [...prev, newClient]);
+      await addClient(clientData);
 
       // Vulnerable — stored XSS (showing raw user input in an alert/HTML may execute injected scripts)
       alert(`Client added: ${clientData.fullName}`);
+
+      // Fetch all clients to refresh the list
+      await fetchClients();
 
       setClientData({
         fullName: "",
